@@ -97,6 +97,11 @@ app.get('/api/oembed', async (req, res) => {
 
   try {
     const host = new URL(url).hostname.replace('www.', '');
+
+    if (host.includes('open.spotify.com')) {
+      return res.json(await fetchSpotifyMeta(url));
+    }
+
     const matchKey = Object.keys(OEMBED_ENDPOINTS).find(k => host.includes(k));
     if (!matchKey) return res.json({ title: null, artist: null });
 
@@ -109,13 +114,9 @@ app.get('/api/oembed', async (req, res) => {
     let artist = data.author_name || null;
     let thumbnail = data.thumbnail_url || null;
 
-    if (title && artist && title.includes(' - ')) {
+    if (title && title.includes(' - ')) {
       const parts = title.split(' - ');
-      if (parts.length === 2) { artist = parts[0].trim(); title = parts[1].trim(); }
-    }
-    if (title && title.includes(' by ')) {
-      const parts = title.split(' by ');
-      if (parts.length === 2) { title = parts[0].trim(); artist = artist || parts[1].trim(); }
+      if (parts.length >= 2) { artist = parts[0].trim(); title = parts.slice(1).join(' - ').trim(); }
     }
 
     res.json({ title, artist, thumbnail });
@@ -124,6 +125,45 @@ app.get('/api/oembed', async (req, res) => {
     res.json({ title: null, artist: null });
   }
 });
+
+async function fetchSpotifyMeta(url) {
+  try {
+    const [pageResp, oembedResp] = await Promise.all([
+      fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, redirect: 'follow' }),
+      fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`),
+    ]);
+
+    let title = null, artist = null, thumbnail = null;
+
+    if (oembedResp.ok) {
+      const oe = await oembedResp.json();
+      title = oe.title || null;
+      thumbnail = oe.thumbnail_url || null;
+    }
+
+    if (pageResp.ok) {
+      const html = await pageResp.text();
+      const descMatch = html.match(/<meta name="description" content="([^"]+)"/);
+      if (descMatch) {
+        const desc = descMatch[1];
+        const byMatch = desc.match(/(?:Song|Track)\s*[·•]\s*(.+?)(?:\s*[·•]|$)/);
+        if (byMatch) artist = byMatch[1].trim();
+      }
+      if (!artist) {
+        const titleMatch = html.match(/<title>(.+?)<\/title>/);
+        if (titleMatch) {
+          const m = titleMatch[1].match(/by\s+(.+?)\s*\|/);
+          if (m) artist = m[1].trim();
+        }
+      }
+    }
+
+    return { title, artist, thumbnail };
+  } catch (e) {
+    console.error('Spotify meta error:', e.message);
+    return { title: null, artist: null };
+  }
+}
 
 // ── Health check ────────────────────────────────────────
 app.get('/health', (req, res) => res.json({

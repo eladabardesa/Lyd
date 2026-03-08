@@ -1,0 +1,81 @@
+const express = require('express');
+const cors = require('cors');
+const { createClient } = require('@supabase/supabase-js');
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+app.use(express.static('.'));
+
+// ── Supabase ────────────────────────────────────────────
+// Replace these with your actual Supabase project values.
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ibojpbedaxyekuevyxvj.supabase.co';
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+
+if (!SUPABASE_SERVICE_KEY) {
+  console.error('SUPABASE_SERVICE_KEY environment variable is required');
+  process.exit(1);
+}
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+// ── Copenhagen district bounding boxes ──────────────────
+const DISTRICTS = [
+  { name: 'Indre By',        latMin: 55.670, latMax: 55.685, lngMin: 12.555, lngMax: 12.590 },
+  { name: 'Vesterbro',       latMin: 55.662, latMax: 55.676, lngMin: 12.530, lngMax: 12.560 },
+  { name: 'Nørrebro',        latMin: 55.685, latMax: 55.710, lngMin: 12.530, lngMax: 12.565 },
+  { name: 'Østerbro',        latMin: 55.690, latMax: 55.720, lngMin: 12.560, lngMax: 12.600 },
+  { name: 'Frederiksberg',   latMin: 55.668, latMax: 55.688, lngMin: 12.500, lngMax: 12.535 },
+  { name: 'Christianshavn',  latMin: 55.665, latMax: 55.678, lngMin: 12.580, lngMax: 12.605 },
+  { name: 'Amager',          latMin: 55.630, latMax: 55.665, lngMin: 12.570, lngMax: 12.630 },
+  { name: 'Valby',           latMin: 55.650, latMax: 55.668, lngMin: 12.495, lngMax: 12.535 },
+  { name: 'Brønshøj',        latMin: 55.700, latMax: 55.730, lngMin: 12.490, lngMax: 12.530 },
+  { name: 'Vanløse',         latMin: 55.670, latMax: 55.695, lngMin: 12.480, lngMax: 12.510 },
+  { name: 'Sydhavn',         latMin: 55.645, latMax: 55.668, lngMin: 12.535, lngMax: 12.575 },
+];
+
+function assignNeighborhood(lat, lng) {
+  for (const d of DISTRICTS) {
+    if (lat >= d.latMin && lat <= d.latMax && lng >= d.lngMin && lng <= d.lngMax) {
+      return d.name;
+    }
+  }
+  return 'Copenhagen';
+}
+
+// ── POST /api/pins — create a new pin ───────────────────
+app.post('/api/pins', async (req, res) => {
+  const { lat, lng, song, artist, source, url, note, genre, privacy_radius } = req.body;
+
+  if (!lat || !lng || !song) {
+    return res.status(400).json({ error: 'lat, lng, and song are required' });
+  }
+
+  const neighborhood = assignNeighborhood(lat, lng);
+
+  const row = {
+    lat: parseFloat(lat),
+    lng: parseFloat(lng),
+    song,
+    artist: artist || null,
+    source: source || null,
+    url: url || null,
+    note: note || null,
+    genre: genre || null,
+    neighborhood,
+    privacy_radius: privacy_radius != null ? parseInt(privacy_radius) : 300,
+  };
+
+  const { data, error } = await supabase.from('pins').insert([row]).select();
+
+  if (error) {
+    console.error('Supabase insert error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+
+  res.status(201).json(data[0]);
+});
+
+// ── Start ───────────────────────────────────────────────
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Lyd server running on http://localhost:${PORT}`));

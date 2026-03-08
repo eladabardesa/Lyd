@@ -1,0 +1,17 @@
+{
+  "name": "Lyd — Copenhagen Sound Map",
+  "short_name": "Lyd",
+  "description": "What is Copenhagen listening to? Pin the sound around you.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8f7f4",
+  "theme_color": "#f8f7f4",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a1a' width='100' height='100' rx='20'/><text x='50' y='68' text-anchor='middle' font-size='52' font-family='Georgia,serif' font-style='italic' fill='%23f8f7f4'>L</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

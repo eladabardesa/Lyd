@@ -80,6 +80,9 @@ app.post('/api/pins', async (req, res) => {
   res.status(201).json(data[0]);
 });
 
+// ── Health check ────────────────────────────────────────
+app.get('/health', (req, res) => res.json({ ok: true }));
+
 // ── Start ───────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Lyd server running on http://localhost:${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`Lyd server listening on 0.0.0.0:${PORT}`));

@@ -51,7 +51,7 @@ app.post('/api/pins', async (req, res) => {
     return res.status(503).json({ error: 'Server not configured — Supabase client failed' });
   }
 
-  const { lat, lng, song, artist, source, url, note, genre, privacy_radius } = req.body;
+  const { lat, lng, song, artist, source, url, note, genre, privacy_radius, thumbnail } = req.body;
 
   if (!lat || !lng || !song) {
     return res.status(400).json({ error: 'lat, lng, and song are required' });
@@ -68,6 +68,7 @@ app.post('/api/pins', async (req, res) => {
     url: url || null,
     note: note || null,
     genre: genre || null,
+    thumbnail: thumbnail || null,
     neighborhood,
     privacy_radius: privacy_radius != null ? parseInt(privacy_radius) : 300,
   };

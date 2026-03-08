@@ -1051,6 +1051,7 @@ async function parseLink() {
       document.getElementById('parsedArtist').textContent = meta.artist;
       document.getElementById('parsedArtistEdit').value = meta.artist;
     }
+    if (meta.thumbnail) parsedData.thumbnail = meta.thumbnail;
     checkSubmit();
   } catch {}
 }
@@ -1115,11 +1116,12 @@ function closeModal() { document.getElementById('modalOverlay').classList.remove
    ================================================================ */
 async function submitSound() {
   if (!userLoc) return;
-  let song,artist,source,url;
+  let song,artist,source,url,thumbnail=null;
   if (activeTab==='stream' && parsedData) {
     song=document.getElementById('parsedSongEdit').value.trim()||parsedData.song||parsedData.platform+' track';
     artist=document.getElementById('parsedArtistEdit').value.trim()||parsedData.artist||'';
     source=parsedData.platform; url=parsedData.url;
+    thumbnail=parsedData.thumbnail||null;
   } else {
     song=document.getElementById('songInput').value.trim();
     artist=document.getElementById('artistInput').value.trim();
@@ -1131,7 +1133,7 @@ async function submitSound() {
   try {
     const res = await fetch((API_BASE||'')+'/api/pins', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ lat:parseFloat(pos.lat.toFixed(5)), lng:parseFloat(pos.lng.toFixed(5)), song,artist,source,url,note, genre:null, privacy_radius:r }),
+      body: JSON.stringify({ lat:parseFloat(pos.lat.toFixed(5)), lng:parseFloat(pos.lng.toFixed(5)), song,artist,source,url,note, genre:null, thumbnail, privacy_radius:r }),
     });
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || 'Save failed');
@@ -1164,17 +1166,20 @@ function renderPins(pins) {
     const color=sourceColor(pin.source);
     const marker=L.marker([pin.lat,pin.lng],{icon:makeIcon(color)});
     const ts=pin.created_at?timeAgo(pin.created_at):'';
-    const link=pin.url?`<a class="popup__link" href="${esc(pin.url)}" target="_blank" rel="noopener">↗ Open on ${esc(pin.source)}</a>`:'';
+    const thumb=pin.thumbnail?`<img src="${esc(pin.thumbnail)}" style="width:100%;border-radius:var(--radius-sm);margin-bottom:var(--space-4)" alt="">`:'';
+    const songLink=pin.url?`<a class="popup__link" href="https://song.link/${encodeURIComponent(pin.url)}" target="_blank" rel="noopener">Listen on all platforms ↗</a>`:'';
+    const directLink=pin.url?`<a class="popup__link" href="${esc(pin.url)}" target="_blank" rel="noopener" style="margin-left:var(--space-4)">Open on ${esc(pin.source)} ↗</a>`:'';
     const priv=pin.privacy_radius?`<div class="popup__privacy">📍 ${privLabel(pin.privacy_radius)}</div>`:'';
     marker.bindPopup(`<div class="popup">
+      ${thumb}
       <span class="popup__badge" style="color:${color};background:${color}18">${esc(pin.source||'—')}</span>
       <div class="popup__artist">${esc(pin.artist||'—')}</div>
       <div class="popup__song">${esc(pin.song)}</div>
       ${pin.note?`<div class="popup__note">${esc(pin.note)}</div>`:''}
-      ${link}
+      <div style="display:flex;flex-wrap:wrap">${songLink}${directLink}</div>
       <div class="popup__time">${ts}</div>
       ${priv}
-    </div>`);
+    </div>`, { maxWidth: 280 });
     marker.pinData=pin;
     markerLayer.addLayer(marker);
   });

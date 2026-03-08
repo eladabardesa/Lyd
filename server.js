@@ -13,11 +13,12 @@ const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ibojpbedaxyekuevyxvj.s
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
 if (!SUPABASE_SERVICE_KEY) {
-  console.error('SUPABASE_SERVICE_KEY environment variable is required');
-  process.exit(1);
+  console.warn('WARNING: SUPABASE_SERVICE_KEY not set — pin submissions will fail until configured');
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+const supabase = SUPABASE_SERVICE_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+  : null;
 
 // ── Copenhagen district bounding boxes ──────────────────
 const DISTRICTS = [
@@ -45,6 +46,10 @@ function assignNeighborhood(lat, lng) {
 
 // ── POST /api/pins — create a new pin ───────────────────
 app.post('/api/pins', async (req, res) => {
+  if (!supabase) {
+    return res.status(503).json({ error: 'Server not configured — SUPABASE_SERVICE_KEY is missing' });
+  }
+
   const { lat, lng, song, artist, source, url, note, genre, privacy_radius } = req.body;
 
   if (!lat || !lng || !song) {

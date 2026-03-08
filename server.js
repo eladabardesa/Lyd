@@ -9,16 +9,15 @@ app.use(express.static('.'));
 
 // ── Supabase ────────────────────────────────────────────
 // Replace these with your actual Supabase project values.
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ibojpbedaxyekuevyxvj.supabase.co';
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
-
-if (!SUPABASE_SERVICE_KEY) {
-  console.warn('WARNING: SUPABASE_SERVICE_KEY not set — pin submissions will fail until configured');
-}
+const env = Object.assign({}, process.env);
+const SUPABASE_URL = env.SUPABASE_URL || 'https://ibojpbedaxyekuevyxvj.supabase.co';
+const SUPABASE_SERVICE_KEY = env.SUPABASE_SERVICE_KEY || '';
 
 const supabase = SUPABASE_SERVICE_KEY
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
   : null;
+
+if (!supabase) console.warn('SUPABASE_SERVICE_KEY not set — pin submissions disabled');
 
 // ── Copenhagen district bounding boxes ──────────────────
 const DISTRICTS = [

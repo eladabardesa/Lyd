@@ -45,8 +45,11 @@ function assignNeighborhood(lat, lng) {
 
 // ── POST /api/pins — create a new pin ───────────────────
 app.post('/api/pins', async (req, res) => {
+  console.log('POST /api/pins', JSON.stringify(req.body).slice(0, 200));
+
   if (!supabase) {
-    return res.status(503).json({ error: 'Server not configured — SUPABASE_SERVICE_KEY is missing' });
+    console.error('supabase client is null — SUPABASE_SERVICE_KEY:', SUPABASE_SERVICE_KEY ? 'set' : 'NOT SET');
+    return res.status(503).json({ error: 'Server not configured — missing database key' });
   }
 
   const { lat, lng, song, artist, source, url, note, genre, privacy_radius } = req.body;

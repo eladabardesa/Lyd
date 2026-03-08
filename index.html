@@ -838,20 +838,6 @@ button { touch-action: manipulation; }
         <label class="field__label">A note (optional)</label>
         <textarea class="field__textarea" id="noteInput" rows="2" placeholder="Why this, here, now?"></textarea>
       </div>
-      <div class="divider">genre (optional)</div>
-      <div class="genre-pills" id="genrePills">
-        <button class="genre-pill" aria-pressed="false" data-genre="ambient">ambient</button>
-        <button class="genre-pill" aria-pressed="false" data-genre="classical">classical</button>
-        <button class="genre-pill" aria-pressed="false" data-genre="electronic">electronic</button>
-        <button class="genre-pill" aria-pressed="false" data-genre="folk">folk</button>
-        <button class="genre-pill" aria-pressed="false" data-genre="hip-hop">hip-hop</button>
-        <button class="genre-pill" aria-pressed="false" data-genre="jazz">jazz</button>
-        <button class="genre-pill" aria-pressed="false" data-genre="metal">metal</button>
-        <button class="genre-pill" aria-pressed="false" data-genre="pop">pop</button>
-        <button class="genre-pill" aria-pressed="false" data-genre="rock">rock</button>
-        <button class="genre-pill" aria-pressed="false" data-genre="world">world</button>
-        <button class="genre-pill" aria-pressed="false" data-genre="other">other</button>
-      </div>
       <div class="divider">privacy</div>
       <div class="privacy">
         <div class="privacy__title">How precise should your pin be?</div>
@@ -942,7 +928,7 @@ geocoder.on('markgeocode', e => {
    STATE
    ================================================================ */
 let userLoc = null, allPins = [], activeTab = 'stream', parsedData = null;
-let selectedGenre = null, exploreMode = 'now', heatLayer = null;
+let exploreMode = 'now', heatLayer = null;
 let realtimeSub = null, exploreOpen = false, clipboardUrl = null;
 
 const SOURCE_COLORS = {
@@ -1054,15 +1040,14 @@ function parseLink() {
 }
 
 /* ================================================================
-   GENRE PILLS
+   ENTER KEY IN NOTE — advance to submit instead of newline
    ================================================================ */
-document.getElementById('genrePills').addEventListener('click', e => {
-  const pill = e.target.closest('.genre-pill');
-  if (!pill) return;
-  const wasSelected = pill.getAttribute('aria-pressed') === 'true';
-  document.querySelectorAll('.genre-pill').forEach(p => p.setAttribute('aria-pressed','false'));
-  if (!wasSelected) { pill.setAttribute('aria-pressed','true'); selectedGenre = pill.dataset.genre; }
-  else { selectedGenre = null; }
+document.getElementById('noteInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    const btn = document.getElementById('submitBtn');
+    if (!btn.disabled) btn.click();
+  }
 });
 
 /* ================================================================
@@ -1099,8 +1084,8 @@ function getLocation() {
    ================================================================ */
 function checkSubmit() {
   let hasMusic = activeTab==='stream'
-    ? parsedData!=null && document.getElementById('parsedSongEdit').value.trim().length>0
-    : document.getElementById('songInput').value.trim().length>0;
+    ? parsedData != null
+    : document.getElementById('songInput').value.trim().length > 0;
   document.getElementById('submitBtn').disabled = !(hasMusic && userLoc);
 }
 
@@ -1109,8 +1094,7 @@ function openModal(prefillUrl) {
   ['linkInput','songInput','artistInput','noteInput'].forEach(id => document.getElementById(id).value='');
   document.getElementById('sourceSelect').selectedIndex=0;
   document.getElementById('parsedPreview').classList.remove('show');
-  document.querySelectorAll('.genre-pill').forEach(p => p.setAttribute('aria-pressed','false'));
-  parsedData=null; selectedGenre=null; userLoc=null;
+  parsedData=null; userLoc=null;
   switchTab('stream');
   document.getElementById('submitBtn').disabled=true;
   setLocStatus('fetching'); getLocation();
@@ -1128,8 +1112,8 @@ async function submitSound() {
   if (!userLoc) return;
   let song,artist,source,url;
   if (activeTab==='stream' && parsedData) {
-    song=document.getElementById('parsedSongEdit').value.trim()||parsedData.song;
-    artist=document.getElementById('parsedArtistEdit').value.trim()||parsedData.artist;
+    song=document.getElementById('parsedSongEdit').value.trim()||parsedData.song||parsedData.platform+' track';
+    artist=document.getElementById('parsedArtistEdit').value.trim()||parsedData.artist||'';
     source=parsedData.platform; url=parsedData.url;
   } else {
     song=document.getElementById('songInput').value.trim();
@@ -1142,14 +1126,14 @@ async function submitSound() {
   try {
     const res = await fetch((API_BASE||'')+'/api/pins', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ lat:parseFloat(pos.lat.toFixed(5)), lng:parseFloat(pos.lng.toFixed(5)), song,artist,source,url,note, genre:selectedGenre, privacy_radius:r }),
+      body: JSON.stringify({ lat:parseFloat(pos.lat.toFixed(5)), lng:parseFloat(pos.lng.toFixed(5)), song,artist,source,url,note, genre:null, privacy_radius:r }),
     });
-    if (!res.ok) throw new Error('Save failed');
-    const pin = await res.json();
-    allPins.unshift(pin); renderPins(); updateCount();
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Save failed');
+    allPins.unshift(body); renderPins(); updateCount();
     closeModal(); showToast('Sound pinned ♪');
-    map.flyTo([pin.lat,pin.lng],15,{duration:1.2});
-  } catch (err) { showToast('Error — try again'); console.error(err); }
+    map.flyTo([body.lat,body.lng],15,{duration:1.2});
+  } catch (err) { showToast(err.message || 'Error — try again'); console.error(err); }
 }
 
 /* ================================================================

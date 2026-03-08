@@ -10,14 +10,14 @@ app.use(express.static('.'));
 // ── Supabase ────────────────────────────────────────────
 // Replace these with your actual Supabase project values.
 const SUPABASE_URL = 'https://ibojpbedaxyekuevyxvj.supabase.co';
-const SUPABASE_SERVICE_KEY = process.env['SUPABASE_SERVICE_KEY'] || '';
+const SUPABASE_KEY = process.env['SUPABASE_KEY']
+  || process.env['SUPABASE_SERVICE_KEY']
+  || 'sb_publishable_u6NT6jO2LEmdE2KqU7wA2Q_43nF_WXj';
 
 let supabase = null;
-if (SUPABASE_SERVICE_KEY) {
-  try { supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY); }
-  catch (e) { console.error('Supabase init error:', e.message); }
-}
-if (!supabase) console.warn('Supabase not configured — pin submissions disabled');
+try { supabase = createClient(SUPABASE_URL, SUPABASE_KEY); }
+catch (e) { console.error('Supabase init error:', e.message); }
+if (!supabase) console.warn('Supabase client failed to initialize');
 
 // ── Copenhagen district bounding boxes ──────────────────
 const DISTRICTS = [
@@ -48,8 +48,7 @@ app.post('/api/pins', async (req, res) => {
   console.log('POST /api/pins', JSON.stringify(req.body).slice(0, 200));
 
   if (!supabase) {
-    console.error('supabase client is null — SUPABASE_SERVICE_KEY:', SUPABASE_SERVICE_KEY ? 'set' : 'NOT SET');
-    return res.status(503).json({ error: 'Server not configured — missing database key' });
+    return res.status(503).json({ error: 'Server not configured — Supabase client failed' });
   }
 
   const { lat, lng, song, artist, source, url, note, genre, privacy_radius } = req.body;
@@ -169,8 +168,8 @@ async function fetchSpotifyMeta(url) {
 app.get('/health', (req, res) => res.json({
   ok: true,
   supabase: supabase ? 'connected' : 'not configured',
-  keySet: !!SUPABASE_SERVICE_KEY,
-  keyLength: SUPABASE_SERVICE_KEY.length,
+  keyPrefix: SUPABASE_KEY.slice(0, 16) + '…',
+  keyLength: SUPABASE_KEY.length,
 }));
 
 // ── Start ───────────────────────────────────────────────

@@ -836,7 +836,7 @@ button { touch-action: manipulation; }
       </div>
       <div class="field" style="margin-top:var(--space-2)">
         <label class="field__label">A note (optional)</label>
-        <textarea class="field__textarea" id="noteInput" rows="2" placeholder="Why this, here, now?"></textarea>
+        <input class="field__input" type="text" id="noteInput" placeholder="Why this, here, now?" />
       </div>
       <div class="divider">privacy</div>
       <div class="privacy">
@@ -1023,32 +1023,37 @@ function onLinkType() {
   else { parsedData = null; document.getElementById('parsedPreview').classList.remove('show'); checkSubmit(); }
 }
 
-function parseLink() {
+async function parseLink() {
   const url = document.getElementById('linkInput').value.trim();
   if (!url) return;
   const result = heuristicParse(url);
   if (!result) return;
   parsedData = result;
-  document.getElementById('parsedSong').textContent = result.song || '(track name unknown from URL)';
+
+  document.getElementById('parsedSong').textContent = result.song || 'Fetching…';
   document.getElementById('parsedArtist').textContent = result.artist || '—';
   document.getElementById('parsedSource').textContent = '↗ ' + result.platform;
   document.getElementById('parsedSongEdit').value = result.song;
   document.getElementById('parsedArtistEdit').value = result.artist;
   document.getElementById('parsedPreview').classList.add('show');
-  if (!result.song) document.getElementById('parsedSongEdit').focus();
   checkSubmit();
-}
 
-/* ================================================================
-   ENTER KEY IN NOTE — advance to submit instead of newline
-   ================================================================ */
-document.getElementById('noteInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    const btn = document.getElementById('submitBtn');
-    if (!btn.disabled) btn.click();
-  }
-});
+  try {
+    const resp = await fetch('/api/oembed?url=' + encodeURIComponent(url));
+    const meta = await resp.json();
+    if (meta.title) {
+      parsedData.song = meta.title;
+      document.getElementById('parsedSong').textContent = meta.title;
+      document.getElementById('parsedSongEdit').value = meta.title;
+    }
+    if (meta.artist) {
+      parsedData.artist = meta.artist;
+      document.getElementById('parsedArtist').textContent = meta.artist;
+      document.getElementById('parsedArtistEdit').value = meta.artist;
+    }
+    checkSubmit();
+  } catch {}
+}
 
 /* ================================================================
    PRIVACY / FUZZ

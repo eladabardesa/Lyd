@@ -7,6 +7,12 @@ ALTER TABLE pins ADD COLUMN IF NOT EXISTS genre TEXT;
 -- 2. Add neighborhood column (derived server-side from bounding boxes)
 ALTER TABLE pins ADD COLUMN IF NOT EXISTS neighborhood TEXT;
 
+-- 2b. Add thumbnail column (oEmbed cover art URL)
+ALTER TABLE pins ADD COLUMN IF NOT EXISTS thumbnail TEXT;
+
+-- 2c. Add optional username column
+ALTER TABLE pins ADD COLUMN IF NOT EXISTS username TEXT;
+
 -- 3. Materialized view for fast aggregations
 --    All dashboard / explore queries hit this view, never the raw table.
 CREATE MATERIALIZED VIEW IF NOT EXISTS pin_stats AS

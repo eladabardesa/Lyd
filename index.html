@@ -265,9 +265,77 @@ button { touch-action: manipulation; }
 }
 
 /* ================================================================
+   TIME FILTER BAR
+   ================================================================ */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-8);
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.filter-bar::-webkit-scrollbar { display: none; }
+.filter-pill {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: var(--tracking-sm);
+  text-transform: uppercase;
+  padding: var(--space-2) var(--space-5);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  white-space: nowrap;
+  min-height: 32px;
+  font-family: var(--font-sans);
+  touch-action: manipulation;
+}
+.filter-pill:hover { color: var(--color-text); background: var(--color-surface-2); }
+.filter-pill[aria-pressed="true"] {
+  color: var(--color-text);
+  background: var(--color-accent-faint);
+  border-color: var(--color-border);
+}
+
+/* ================================================================
+   STATS BILLBOARD
+   ================================================================ */
+.stats-billboard {
+  position: absolute;
+  bottom: 24px;
+  left: 12px;
+  z-index: 800;
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-6);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  gap: var(--space-6);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-sm);
+  color: var(--color-muted);
+  pointer-events: none;
+  max-width: calc(100vw - 24px);
+  overflow-x: auto;
+}
+.stats-billboard__item { white-space: nowrap; display: flex; align-items: center; gap: var(--space-2); }
+.stats-billboard__num { font-weight: 600; color: var(--color-text); font-size: var(--text-sm); }
+
+@media (max-width: 640px) {
+  .filter-bar { padding: var(--space-3) var(--space-5); }
+  .stats-billboard { bottom: 12px; left: 8px; gap: var(--space-4); padding: var(--space-3) var(--space-5); }
+}
+
+/* ================================================================
    MAP
    ================================================================ */
-#map { flex: 1; z-index: var(--z-map); }
+#map { flex: 1; z-index: var(--z-map); min-height: 0; }
 .leaflet-popup-content-wrapper {
   background: var(--color-surface);
   border: none;
@@ -326,6 +394,7 @@ button { touch-action: manipulation; }
 }
 .popup__link:hover { border-color: var(--color-text); }
 .popup__time { font-size: var(--text-xs); color: var(--color-muted); margin-top: var(--space-4); }
+.popup__username { font-size: var(--text-xs); color: var(--color-muted); margin-top: var(--space-1); font-style: italic; }
 .popup__privacy { font-size: var(--text-xs); color: var(--color-muted); margin-top: var(--space-1); }
 
 /* ================================================================
@@ -754,7 +823,24 @@ button { touch-action: manipulation; }
   </div>
 </header>
 
-<div id="map"></div>
+<div class="filter-bar" id="filterBar">
+  <button class="filter-pill" aria-pressed="true" data-filter="all" onclick="setTimeFilter('all')">All</button>
+  <button class="filter-pill" aria-pressed="false" data-filter="today" onclick="setTimeFilter('today')">Today</button>
+  <button class="filter-pill" aria-pressed="false" data-filter="3days" onclick="setTimeFilter('3days')">3 Days</button>
+  <button class="filter-pill" aria-pressed="false" data-filter="week" onclick="setTimeFilter('week')">This Week</button>
+  <button class="filter-pill" aria-pressed="false" data-filter="morning" onclick="setTimeFilter('morning')">Morning</button>
+  <button class="filter-pill" aria-pressed="false" data-filter="evening" onclick="setTimeFilter('evening')">Evening</button>
+</div>
+
+<div style="position:relative;flex:1;display:flex;flex-direction:column">
+  <div id="map" style="flex:1"></div>
+  <div class="stats-billboard" id="statsBillboard">
+    <div class="stats-billboard__item"><span class="stats-billboard__num" id="statToday">0</span> today</div>
+    <div class="stats-billboard__item"><span class="stats-billboard__num" id="statMorning">0</span> morning</div>
+    <div class="stats-billboard__item"><span class="stats-billboard__num" id="statEvening">0</span> evening</div>
+    <div class="stats-billboard__item"><span class="stats-billboard__num" id="statWeek">0</span> this week</div>
+  </div>
+</div>
 
 <aside class="explore" id="explorePanel" aria-hidden="true">
   <div class="explore__header">
@@ -835,6 +921,10 @@ button { touch-action: manipulation; }
         </div>
       </div>
       <div class="field" style="margin-top:var(--space-2)">
+        <label class="field__label">Your name (optional)</label>
+        <input class="field__input" type="text" id="usernameInput" placeholder="Anonymous" />
+      </div>
+      <div class="field">
         <label class="field__label">A note (optional)</label>
         <input class="field__input" type="text" id="noteInput" placeholder="Why this, here, now?" />
       </div>
@@ -930,6 +1020,7 @@ geocoder.on('markgeocode', e => {
 let userLoc = null, allPins = [], activeTab = 'stream', parsedData = null;
 let exploreMode = 'now', heatLayer = null;
 let realtimeSub = null, exploreOpen = false, clipboardUrl = null;
+let activeFilter = 'all';
 
 const SOURCE_COLORS = {
   Spotify:'#1db954','Apple Music':'#fc3c44',Bandcamp:'#1da0c3',
@@ -1102,6 +1193,8 @@ function openModal(prefillUrl) {
   document.getElementById('parsedPreview').classList.remove('show');
   parsedData=null; userLoc=null;
   switchTab('stream');
+  const savedName = localStorage.getItem('lyd_username') || '';
+  document.getElementById('usernameInput').value = savedName;
   document.getElementById('submitBtn').disabled=true;
   setLocStatus('fetching'); getLocation();
   if (prefillUrl) {
@@ -1129,11 +1222,13 @@ async function submitSound() {
   }
   if (!song) return;
   const note=document.getElementById('noteInput').value.trim();
+  const usernameVal=document.getElementById('usernameInput').value.trim();
+  if (usernameVal) localStorage.setItem('lyd_username', usernameVal);
   const r=getRadius(), pos=fuzz(userLoc.lat,userLoc.lng,r);
   try {
     const res = await fetch((API_BASE||'')+'/api/pins', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ lat:parseFloat(pos.lat.toFixed(5)), lng:parseFloat(pos.lng.toFixed(5)), song,artist,source,url,note, genre:null, thumbnail, privacy_radius:r }),
+      body: JSON.stringify({ lat:parseFloat(pos.lat.toFixed(5)), lng:parseFloat(pos.lng.toFixed(5)), song,artist,source,url,note, genre:null, thumbnail, username:usernameVal||null, privacy_radius:r }),
     });
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || 'Save failed');
@@ -1159,30 +1254,103 @@ function makeIcon(color) {
 
 function privLabel(r) { return !r?'':r<=80?'street-level · drifted':'neighbourhood-level · drifted'; }
 
+const POPULARITY_COLORS = ['#8a8880','#c47a44','#e05050'];
+
+function getPopularityColor(count) {
+  if (count >= 4) return POPULARITY_COLORS[2];
+  if (count >= 2) return POPULARITY_COLORS[1];
+  return POPULARITY_COLORS[0];
+}
+
+function computeSongFrequency(pins) {
+  const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+  const todayPins = pins.filter(p => new Date(p.created_at) >= todayStart);
+  const freq = {};
+  todayPins.forEach(p => {
+    const key = (p.song||'').toLowerCase() + '|||' + (p.artist||'').toLowerCase();
+    freq[key] = (freq[key] || 0) + 1;
+  });
+  return freq;
+}
+
 function renderPins(pins) {
-  const data = pins || allPins;
+  const data = pins || applyTimeFilter(allPins);
   markerLayer.clearLayers();
+  const songFreq = computeSongFrequency(data);
   data.forEach(pin => {
-    const color=sourceColor(pin.source);
+    const songKey = (pin.song||'').toLowerCase() + '|||' + (pin.artist||'').toLowerCase();
+    const freq = songFreq[songKey] || 1;
+    const color = getPopularityColor(freq);
+    const badgeColor = sourceColor(pin.source);
     const marker=L.marker([pin.lat,pin.lng],{icon:makeIcon(color)});
     const ts=pin.created_at?timeAgo(pin.created_at):'';
     const thumb=pin.thumbnail?`<img src="${esc(pin.thumbnail)}" style="width:100%;border-radius:var(--radius-sm);margin-bottom:var(--space-4)" alt="">`:'';
     const songLink=pin.url?`<a class="popup__link" href="https://song.link/${encodeURIComponent(pin.url)}" target="_blank" rel="noopener">Listen on all platforms ↗</a>`:'';
     const directLink=pin.url?`<a class="popup__link" href="${esc(pin.url)}" target="_blank" rel="noopener" style="margin-left:var(--space-4)">Open on ${esc(pin.source)} ↗</a>`:'';
     const priv=pin.privacy_radius?`<div class="popup__privacy">📍 ${privLabel(pin.privacy_radius)}</div>`:'';
+    const usernameHtml=pin.username?`<div class="popup__username">pinned by ${esc(pin.username)}</div>`:'';
     marker.bindPopup(`<div class="popup">
       ${thumb}
-      <span class="popup__badge" style="color:${color};background:${color}18">${esc(pin.source||'—')}</span>
+      <span class="popup__badge" style="color:${badgeColor};background:${badgeColor}18">${esc(pin.source||'—')}</span>
       <div class="popup__artist">${esc(pin.artist||'—')}</div>
       <div class="popup__song">${esc(pin.song)}</div>
       ${pin.note?`<div class="popup__note">${esc(pin.note)}</div>`:''}
       <div style="display:flex;flex-wrap:wrap">${songLink}${directLink}</div>
       <div class="popup__time">${ts}</div>
+      ${usernameHtml}
       ${priv}
     </div>`, { maxWidth: 280 });
     marker.pinData=pin;
     markerLayer.addLayer(marker);
   });
+  updateStats();
+}
+
+/* ================================================================
+   TIME FILTERS & STATS
+   ================================================================ */
+function applyTimeFilter(pins) {
+  if (activeFilter === 'all') return pins;
+  const now = new Date();
+  const todayStart = new Date(now); todayStart.setHours(0,0,0,0);
+  return pins.filter(p => {
+    const d = new Date(p.created_at);
+    switch (activeFilter) {
+      case 'today': return d >= todayStart;
+      case '3days': { const t = new Date(now - 3*24*3600000); return d >= t; }
+      case 'week':  { const t = new Date(now - 7*24*3600000); return d >= t; }
+      case 'morning': return d >= todayStart && d.getHours() >= 6 && d.getHours() < 12;
+      case 'evening': return d >= todayStart && d.getHours() >= 18;
+      default: return true;
+    }
+  });
+}
+
+function setTimeFilter(f) {
+  activeFilter = f;
+  document.querySelectorAll('.filter-pill').forEach(b => b.setAttribute('aria-pressed', b.dataset.filter === f));
+  renderPins();
+}
+
+function updateStats() {
+  const now = new Date();
+  const todayStart = new Date(now); todayStart.setHours(0,0,0,0);
+  const weekAgo = new Date(now - 7*24*3600000);
+  let today=0, morning=0, evening=0, week=0;
+  allPins.forEach(p => {
+    const d = new Date(p.created_at);
+    if (d >= weekAgo) week++;
+    if (d >= todayStart) {
+      today++;
+      const h = d.getHours();
+      if (h >= 6 && h < 12) morning++;
+      if (h >= 18) evening++;
+    }
+  });
+  document.getElementById('statToday').textContent = today;
+  document.getElementById('statMorning').textContent = morning;
+  document.getElementById('statEvening').textContent = evening;
+  document.getElementById('statWeek').textContent = week;
 }
 
 function updateCount() {
